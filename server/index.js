@@ -535,6 +535,20 @@ const initDb = async () => {
 
 initDb();
 
+// optionally create an ngrok tunnel in development so frontend can reach this local server
+if (process.env.NODE_ENV !== 'production' && process.env.USE_NGROK === 'true') {
+  (async () => {
+    try {
+      const ngrok = require('ngrok');
+      const url = await ngrok.connect({ proto: 'https', addr: PORT });
+      console.log(`🔗 ngrok tunnel established at ${url}`);
+      console.log('   you can use this url as your API_BASE or CORS_ORIGINS');
+    } catch (e) {
+      console.error('❌ ngrok start failed:', e.message);
+    }
+  })();
+}
+
 // FCM 서비스에 DB 연결 풀 전달
 if (fcmNotification.setDatabasePool) {
   fcmNotification.setDatabasePool(pool);
