@@ -135,11 +135,24 @@ if (usePostgres) {
   };
 }
 
-// CORS 설정 - 모든 출처 허용 (개발 환경)
+// CORS 설정 - 출처 허용 목록을 환경변수로 관리
 const corsOptions = {
   origin: function(origin, callback) {
-    // 모든 origin 허용 (개발 환경에서는 안전)
-    callback(null, true);
+    if (!origin) {
+      // Postman이나 curl 같은 non-browser 요청
+      return callback(null, true);
+    }
+    const allowedOrigins = [];
+    if (process.env.CORS_ORIGINS) {
+      // 환경변수에 콤마로 구분된 목록을 넣어 둘 수 있음
+      allowedOrigins.push(...process.env.CORS_ORIGINS.split(',').map(o => o.trim()));
+    }
+    // 개발 편의를 위해 localhost 허용
+    allowedOrigins.push('http://localhost:3000', 'http://localhost:3001');
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    callback(new Error('CORS 정책에 의해 차단됨')); // 브라우저가 에러를 보게 함
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'],
@@ -147,6 +160,7 @@ const corsOptions = {
   maxAge: 3600,
   optionsSuccessStatus: 200 // IE11 호환성
 };
+
 
 app.use(cors(corsOptions));
 
@@ -770,8 +784,10 @@ app.post(api('/login'), async (req, res) => {
     if (!userId || !password) {
       return res.status(400).json({ error: '아이디와 비밀번호를 입력하세요.' });
     }
-    
-    const [users] = await pool.query('SELECT * FROM users WHERE id = ?', [userId]);
+
+    // 사용자가 네온(leavePool) DB에 있다면 거기서 조회, 아니면 primary pool 사용
+    const authDb = leavePool || pool;
+    const [users] = await authDb.query('SELECT * FROM users WHERE id = ?', [userId]);
     
     if (users.length === 0) {
       return res.status(401).json({ error: '아이디 또는 비밀번호가 올바르지 않습니다.' });
@@ -785,7 +801,7 @@ app.post(api('/login'), async (req, res) => {
     }
     
     // 마지막 접속 시간 업데이트
-    await pool.query('UPDATE users SET lastSeen = ? WHERE id = ?', [formatDateForMySQL(new Date()), userId]);
+    await authDb.query('UPDATE users SET lastSeen = ? WHERE id = ?', [formatDateForMySQL(new Date()), userId]);
     
     // 사용자 정보 반환 (비밀번호 제외)
     const { password: _, ...userWithoutPassword } = user;
