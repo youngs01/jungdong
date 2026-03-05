@@ -511,11 +511,21 @@ const initDb = async () => {
     }
 
     // 기본 관리자 계정 생성
-    const [adminRows] = await pool.query('SELECT * FROM users WHERE id = ?', ['jungdong']);
-    if (adminRows.length === 0) {
-      await pool.query(`INSERT INTO users (id, name, role, jobTitle, department, avatar, isManager, password, joinDate) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
-        ['jungdong', '김관리', '관리자', '전산팀장', 'IT 관리팀', 'https://ui-avatars.com/api/?name=Admin&background=334155&color=fff', true, 'admin', formatDateForMySQL(new Date())]);
+    // primary pool에 없는 경우 추가하고, leavePool(Neon)에도 비어 있으면 생성
+    const adminData = ['jungdong', '김관리', '관리자', '전산팀장', 'IT 관리팀',
+      'https://ui-avatars.com/api/?name=Admin&background=334155&color=fff', true, 'admin', formatDateForMySQL(new Date())];
+
+    const checkAndInsert = async (dbPool) => {
+      const [rows] = await dbPool.query('SELECT * FROM users WHERE id = ?', ['jungdong']);
+      if (rows.length === 0) {
+        await dbPool.query(`INSERT INTO users (id, name, role, jobTitle, department, avatar, isManager, password, joinDate) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, adminData);
+      }
+    };
+
+    await checkAndInsert(pool);
+    if (leavePool) {
+      await checkAndInsert(leavePool);
     }
 
   } catch (err) {
