@@ -1,0 +1,120 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Reset and Mobile Safe Area Handling */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --vh: 1vh;
+  --input-height: 6rem;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  height: calc(var(--vh, 1vh) * 100);
+  overflow: hidden;
+}
+
+body {
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Mobile Safe Area Handling */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+/* Full screen adjustments for iOS */
+@supports (-webkit-touch-callout: none) {
+  .h-screen {
+    height: -webkit-fill-available;
+    height: 100dvh;
+  }
+}
+
+/* 환영 메시지 애니메이션 */
+@keyframes toastFadeInOut {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  5% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  95% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+}
+
+.animate-toast {
+  animation: toastFadeInOut 3s ease-in-out forwards;
+}
+
+/* Prevent auto-zoom on iOS on focus */
+input,
+textarea {
+  font-size: 16px !important;
+}
+
+/* Print styles for official documents */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .printable-area,
+  .printable-area * {
+    visibility: visible;
+  }
+  .printable-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 0;
+    margin: 0;
+  }
+  .no-print {
+    display: none !important;
+  }
+  @page {
+    margin: 2cm;
+  }
+}

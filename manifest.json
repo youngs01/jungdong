@@ -1,0 +1,43 @@
+{
+  "short_name": "정동병원 메신저",
+  "name": "정동병원 메신저",
+  "description": "정동병원 직원 메신저 및 근태관리 통합 시스템",
+  "icons": [
+    {
+      "src": "logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#0f172a",
+  "background_color": "#ffffff",
+  "prefer_related_applications": false,
+  "screenshots": [
+    {
+      "src": "https://drive.google.com/thumbnail?id=1ZRxO4ViBK2dghRPf7RvqQUTyBJDDSfaR&sz=w540",
+      "type": "image/png",
+      "sizes": "540x720",
+      "form_factor": "narrow"
+    }
+  ],
+  "categories": ["productivity"],
+  "shortcuts": [
+    {
+      "name": "메시지",
+      "short_name": "메시지",
+      "url": "/?view=chat",
+      "icons": [
+        {
+          "src": "https://drive.google.com/thumbnail?id=1ZRxO4ViBK2dghRPf7RvqQUTyBJDDSfaR&sz=w96",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    }
+  ]
+}
