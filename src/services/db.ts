@@ -2,6 +2,13 @@
 import { User, ChatSession, Message, LeaveRequest, OvertimeRequest, SystemLog, Notice, SaturdayShiftRequest, MaternityBenefit, UserLeaveBalance, LeaveDeductionLog } from '../types';
 
 export const getApiBase = () => {
+  // allow runtime-injected value from server (after index.html loads)
+  if (typeof window !== 'undefined' && (window as any).__API_BASE__) {
+    const injected = (window as any).__API_BASE__;
+    console.log('✅ API Base (injected):', injected);
+    return injected;
+  }
+
   // 환경변수가 설정되어 있으면 우선 사용 (프로덕션/빌드 타임)
   const apiUrl = import.meta.env.VITE_API_URL;
   if (apiUrl && apiUrl.trim()) {

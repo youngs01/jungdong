@@ -183,9 +183,28 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use('/uploads', express.static(uploadsDir));
 
-// 웹 앱 정적 파일 서빙 (messenger/build)
+// 웹 앱 정적 파일 서빙 (messenger/build) with runtime API_BASE injection
 const buildDir = path.join(__dirname, '..', 'build');
 if (fs.existsSync(buildDir)) {
+  // first serve static but intercept index.html to insert runtime variable
+  app.get('/', (req, res, next) => {
+    const indexPath = path.join(buildDir, 'index.html');
+    fs.readFile(indexPath, 'utf8', (err, data) => {
+      if (err) return next(err);
+      // determine runtime apiBase: use ngrok url if available, else use BASE_URL env or request host
+      let runtimeBase = process.env.RUNTIME_API_BASE || '';
+      if (!runtimeBase) {
+        // if ngrok created a tunnel earlier, it's logged to console; we can parse from env
+        // fallback to req.origin with /api
+        runtimeBase = `${req.protocol}://${req.get('host')}/api`;
+      } else if (!runtimeBase.endsWith('/api')) {
+        runtimeBase = runtimeBase.replace(/\/*$/, '') + '/api';
+      }
+      const injected = data.replace('<!--RUNTIME_API_BASE-->',
+        `<script>window.__API_BASE__="${runtimeBase}";</script>`);
+      res.send(injected);
+    });
+  });
   app.use(express.static(buildDir));
 }
 
@@ -543,6 +562,7 @@ if (process.env.NODE_ENV !== 'production' && process.env.USE_NGROK === 'true') {
       const url = await ngrok.connect({ proto: 'https', addr: PORT });
       console.log(`🔗 ngrok tunnel established at ${url}`);
       console.log('   you can use this url as your API_BASE or CORS_ORIGINS');
+      process.env.RUNTIME_API_BASE = url;  // make available for index injection
     } catch (e) {
       console.error('❌ ngrok start failed:', e.message);
     }
@@ -855,7 +875,9 @@ app.get(api('/debug/dbinfo'), (req, res) => {
 });
 
 app.get(api('/users'), async (req, res) => {
-  const [rows] = await pool.query('SELECT * FROM users');
+  // use leavePool if configured so frontend sees the same users used for login
+  const db = leavePool || pool;
+  const [rows] = await db.query('SELECT * FROM users');
   // 상대 경로/HTTP을 처리하여 절대 URL로 변환
   const baseUrl = getBaseUrl(req);
   const usersWithAbsoluteUrls = rows.map(user => ({
@@ -882,7 +904,8 @@ app.get(api('/departments'), async (req, res) => {
 // 하트비트 엔드포인트: 사용자의 마지막 접속 시간 갱신
 app.post(api('/users/heartbeat/:id'), async (req, res) => {
   try {
-    await pool.query('UPDATE users SET lastSeen = ? WHERE id = ?', [formatDateForMySQL(new Date()), req.params.id]);
+    const db = leavePool || pool;
+    await db.query('UPDATE users SET lastSeen = ? WHERE id = ?', [formatDateForMySQL(new Date()), req.params.id]);
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -895,9 +918,20 @@ app.put(api('/users'), async (req, res) => {
   const lastSeen = formatDateForMySQL(u.lastSeen || new Date());
   // jobTitle에서 trailing zero 제거
   const cleanJobTitle = u.jobTitle ? u.jobTitle.replace(/[0]+$/, '') : u.jobTitle;
-  await pool.query(`INSERT INTO users (id, name, role, jobTitle, department, avatar, isManager, isDeptHead, password, joinDate, earnedLeaveHours, additional_leave_days, lastSeen) 
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE name=?, role=?, jobTitle=?, department=?, avatar=?, isManager=?, isDeptHead=?, password=?, joinDate=?, earnedLeaveHours=?, additional_leave_days=?, lastSeen=?`,
-    [u.id, u.name, u.role, cleanJobTitle, u.department, u.avatar, !!u.isManager, !!u.isDeptHead, u.password, joinDate, u.earnedLeaveHours || 0, u.additional_leave_days || 0, lastSeen, u.name, u.role, cleanJobTitle, u.department, u.avatar, !!u.isManager, !!u.isDeptHead, u.password, joinDate, u.earnedLeaveHours || 0, u.additional_leave_days || 0, lastSeen]);
+  const queryStr = `INSERT INTO users (id, name, role, jobTitle, department, avatar, isManager, isDeptHead, password, joinDate, earnedLeaveHours, additional_leave_days, lastSeen) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE name=?, role=?, jobTitle=?, department=?, avatar=?, isManager=?, isDeptHead=?, password=?, joinDate=?, earnedLeaveHours=?, additional_leave_days=?, lastSeen=?`;
+  const params = [u.id, u.name, u.role, cleanJobTitle, u.department, u.avatar, !!u.isManager, !!u.isDeptHead, u.password, joinDate, u.earnedLeaveHours || 0, u.additional_leave_days || 0, lastSeen, u.name, u.role, cleanJobTitle, u.department, u.avatar, !!u.isManager, !!u.isDeptHead, u.password, joinDate, u.earnedLeaveHours || 0, u.additional_leave_days || 0, lastSeen];
+
+  // write to primary
+  await pool.query(queryStr, params);
+  // also write to leavePool if configured (keeps Neon copy in sync)
+  if (leavePool) {
+    try {
+      await leavePool.query(queryStr, params);
+    } catch (e) {
+      console.warn('[users] leavePool insert failed, continuing', e.message);
+    }
+  }
   res.json({ success: true });
 });
 
