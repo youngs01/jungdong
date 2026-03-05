@@ -787,6 +787,7 @@ app.post(api('/login'), async (req, res) => {
 
     // 사용자가 네온(leavePool) DB에 있다면 거기서 조회, 아니면 primary pool 사용
     const authDb = leavePool || pool;
+    console.log('🔐 로그인 인증에 사용할 DB 풀:', leavePool ? 'leavePool (Neon)' : 'primary pool');
     const [users] = await authDb.query('SELECT * FROM users WHERE id = ?', [userId]);
     
     if (users.length === 0) {
@@ -817,6 +818,16 @@ app.post(api('/login'), async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// debug endpoint to verify which database URL is configured
+app.get(api('/debug/dbinfo'), (req, res) => {
+  // show which pool is active and whether LEAVE_DATABASE_URL is set
+  res.json({
+    useLeavePool: !!leavePool,
+    leaveUrl: process.env.LEAVE_DATABASE_URL ? process.env.LEAVE_DATABASE_URL.replace(/(password=)[^&]+/, '$1***') : null,
+    primaryUrl: process.env.DATABASE_URL || null
+  });
 });
 
 app.get(api('/users'), async (req, res) => {
